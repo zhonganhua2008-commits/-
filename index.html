@@ -3,12 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高三备考专属日程打卡</title>
+    <title>高三打卡日程表</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.544.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+        
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
             font-family: 'Noto Sans SC', sans-serif;
             transition: background-color 0.3s, color 0.3s;
@@ -17,13 +22,18 @@
             background-repeat: no-repeat;
             background-attachment: fixed;
             min-height: 100vh;
+            margin: 0;
+            padding: 0;
         }
+        
+        /* 主题颜色变量 */
         .day-type-exercise {
             --primary-color: #93c5fd;
             --primary-dark: #60a5fa;
             --text-color: #1e293b;
             --bg-color: #ffffff;
         }
+        
         .day-type-study {
             --primary-color: #86efac;
             --primary-dark: #4ade80;
@@ -31,25 +41,28 @@
             --bg-color: #ffffff;
         }
         
-        /* 修复护眼模式样式 */
+        /* 护眼模式 */
         .eye-protection {
             --bg-color: #f8f6e8 !important;
             --text-color: #3a3a3a !important;
             background-color: #f8f6e8 !important;
             color: #3a3a3a !important;
         }
-        .eye-protection .content-overlay {
+        
+        .eye-protection .content-overlay,
+        .eye-protection .modal-content,
+        .eye-protection .music-player {
             background-color: rgba(248, 246, 232, 0.95) !important;
             color: #3a3a3a !important;
         }
+        
         .eye-protection .day-type-exercise,
         .eye-protection .day-type-study {
             --primary-color: #8a9a5b !important;
             --primary-dark: #6b7b47 !important;
-            --text-color: #3a3a3a !important;
-            --bg-color: #f8f6e8 !important;
         }
         
+        /* 内容容器 */
         .content-overlay {
             background-color: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(8px);
@@ -57,45 +70,54 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
             transition: background-color 0.3s;
         }
-        .body-dark-overlay {
-            position: relative;
-        }
-        .body-dark-overlay::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.3);
-            z-index: -1;
-        }
-        .打卡按钮 {
+        
+        /* 打卡按钮 */
+        .check-btn {
             background-color: #e5e7eb;
             transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
         }
-        .打卡按钮:hover {
+        
+        .check-btn:hover {
             transform: scale(1.05);
         }
-        .打卡按钮.已完成 {
+        
+        .check-btn.completed {
             background-color: var(--primary-color);
         }
-        .打卡按钮.已完成:hover {
+        
+        .check-btn.completed:hover {
             background-color: var(--primary-dark);
         }
-        .课程项目.已完成 {
+        
+        .schedule-item.completed {
             text-decoration: line-through;
             opacity: 0.7;
         }
-        .统计弹窗, .壁纸弹窗 {
+        
+        /* 弹窗样式 */
+        .modal {
             display: none;
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 1000;
+            max-height: 90vh;
+            overflow-y: auto;
         }
-        .遮罩层 {
+        
+        .modal-content {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+            min-width: 320px;
+            max-width: 600px;
+        }
+        
+        .overlay {
             display: none;
             position: fixed;
             top: 0;
@@ -104,642 +126,1173 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
             z-index: 999;
+            backdrop-filter: blur(2px);
         }
-        .壁纸预览 {
-            width: 100%;
-            height: 150px;
-            object-fit: cover;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            border: 2px dashed #d1d5db;
+        
+        /* 音乐播放器 */
+        .music-player {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 900;
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 1rem;
+            padding: 1rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            border: 1px solid #e5e7eb;
         }
-        .壁纸控制按钮 {
+        
+        /* 编辑模式样式 */
+        .edit-mode {
+            background-color: rgba(255, 243, 205, 0.3);
+            border-left: 3px solid #f59e0b;
+        }
+        
+        .edit-controls {
             display: flex;
             gap: 0.5rem;
-            margin-top: 1rem;
+            opacity: 0;
+            transition: opacity 0.2s;
         }
-        .壁纸上传区域 {
-            border: 2px dashed #93c5fd;
+        
+        tr:hover .edit-controls {
+            opacity: 1;
+        }
+        
+        /* 编辑输入框 */
+        .edit-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        
+        .edit-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            ring: 2px;
+            ring-color: var(--primary-color);
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .modal-content {
+                min-width: 90vw;
+                max-width: 90vw;
+            }
+            
+            .music-player {
+                width: calc(100vw - 40px);
+                left: 20px;
+                right: 20px;
+            }
+            
+            .header-controls {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+        }
+        
+        /* 上传区域 */
+        .upload-area {
+            border: 2px dashed var(--primary-color);
             border-radius: 0.5rem;
             padding: 2rem;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-bottom: 1rem;
         }
-        .壁纸上传区域:hover {
-            border-color: #60a5fa;
+        
+        .upload-area:hover {
+            border-color: var(--primary-dark);
             background-color: rgba(147, 197, 253, 0.1);
         }
-        .壁纸上传区域.dragover {
+        
+        .upload-area.dragover {
             border-color: #4ade80;
             background-color: rgba(134, 239, 172, 0.2);
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* 动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+        
+        /* 编辑模式指示器 */
+        .edit-mode-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #f59e0b;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            z-index: 1001;
+            box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+            display: none;
+        }
+        
+        .edit-mode-active .edit-mode-indicator {
+            display: block;
         }
     </style>
 </head>
 <body class="day-type-exercise">
-
-    <div id="遮罩层" class="遮罩层"></div>
-
+    <!-- 遮罩层 -->
+    <div id="overlay" class="overlay"></div>
+    
+    <!-- 编辑模式指示器 -->
+    <div class="edit-mode-indicator">
+        <i data-lucide="edit-3" class="inline w-4 h-4"></i>
+        编辑模式
+    </div>
+    
+    <!-- 主容器 -->
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <div class="content-overlay p-6 md:p-8">
-            <header class="flex justify-between items-center mb-8">
-                <div class="flex items-center">
-                    <button id="切换日期按钮-前一天" class="p-2 rounded-full hover:bg-gray-100">
+            <!-- 头部 -->
+            <header class="flex flex-wrap justify-between items-center mb-8 gap-4">
+                <div class="flex items-center gap-2">
+                    <button id="prevDay" class="p-2 rounded-full hover:bg-gray-100 transition">
                         <i data-lucide="chevron-left"></i>
                     </button>
-                    <button id="切换日期按钮-后一天" class="p-2 rounded-full hover:bg-gray-100">
+                    <button id="nextDay" class="p-2 rounded-full hover:bg-gray-100 transition">
                         <i data-lucide="chevron-right"></i>
                     </button>
                 </div>
-                <div class="text-center">
-                    <h1 id="当前日期" class="text-2xl font-bold"></h1>
-                    <p id="今日类型" class="text-sm font-semibold mt-1"></p>
-                    <p id="打卡进度" class="text-xs mt-2"></p>
+                
+                <div class="text-center flex-grow">
+                    <h1 id="currentDate" class="text-2xl font-bold"></h1>
+                    <p id="dayType" class="text-sm font-semibold mt-1"></p>
+                    <p id="progress" class="text-xs mt-2 text-gray-600"></p>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <button id="一键打卡按钮" class="px-4 py-2 text-sm rounded-full hover:bg-gray-100">
+                
+                <div class="flex items-center gap-2 header-controls">
+                    <button id="checkAllBtn" class="px-4 py-2 text-sm rounded-full hover:bg-gray-100 transition" title="一键打卡">
                         一键打卡
                     </button>
-                    <button id="统计按钮" class="p-2 rounded-full hover:bg-gray-100">
+                    <button id="editBtn" class="p-2 rounded-full hover:bg-gray-100 transition" title="编辑日程">
+                        <i data-lucide="edit-3"></i>
+                    </button>
+                    <button id="statsBtn" class="p-2 rounded-full hover:bg-gray-100 transition" title="统计">
                         <i data-lucide="bar-chart-3"></i>
                     </button>
-                    <button id="护眼模式按钮" class="p-2 rounded-full hover:bg-gray-100">
+                    <button id="eyeProtectionBtn" class="p-2 rounded-full hover:bg-gray-100 transition" title="护眼模式">
                         <i data-lucide="sun"></i>
                     </button>
-                    <button id="壁纸按钮" class="p-2 rounded-full hover:bg-gray-100">
+                    <button id="wallpaperBtn" class="p-2 rounded-full hover:bg-gray-100 transition" title="壁纸">
                         <i data-lucide="image"></i>
                     </button>
                 </div>
             </header>
-
+            
+            <!-- 日程表 -->
             <main>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left">
                         <thead>
-                            <tr class="border-b">
-                                <th class="py-2 w-1/4">时间段</th>
-                                <th class="py-2 w-2/4 text-center">课程 / 活动内容</th>
-                                <th class="py-2 w-1/4 text-right">时长</th>
+                            <tr class="border-b-2">
+                                <th class="py-3 px-2 w-1/4">时间段</th>
+                                <th class="py-3 px-2 text-center">课程 / 活动内容</th>
+                                <th class="py-3 px-2 w-1/5 text-center">时长</th>
+                                <th class="py-3 px-2 w-24 text-right">操作</th>
                             </tr>
                         </thead>
-                        <tbody id="日程表">
-                            <!-- 日程将通过JS动态生成 -->
+                        <tbody id="scheduleTable">
+                            <!-- 动态生成 -->
                         </tbody>
                     </table>
                 </div>
             </main>
         </div>
     </div>
-
-    <div id="统计弹窗" class="统计弹窗 bg-white rounded-lg shadow-lg p-6 w-80 md:w-96">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-bold">近7天打卡统计</h2>
-            <button id="关闭统计弹窗按钮" class="p-1 rounded-full hover:bg-gray-100">
-                <i data-lucide="x"></i>
-            </button>
-        </div>
-        <div style="height: 200px;">
-            <canvas id="统计图表"></canvas>
+    
+    <!-- 统计弹窗 -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content w-96">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold">近7天打卡统计</h2>
+                <button id="closeStats" class="p-1 rounded-full hover:bg-gray-100">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div style="height: 250px;">
+                <canvas id="statsChart"></canvas>
+            </div>
         </div>
     </div>
-
-    <div id="壁纸弹窗" class="壁纸弹窗 bg-white rounded-lg shadow-lg p-6 w-80 md:w-96">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-bold">自定义壁纸</h2>
-            <button id="关闭壁纸弹窗按钮" class="p-1 rounded-full hover:bg-gray-100">
-                <i data-lucide="x"></i>
-            </button>
-        </div>
-        
-        <div id="当前壁纸预览" style="display: none;">
-            <h3 class="text-sm font-medium mb-2">当前壁纸预览</h3>
-            
-        </div>
-        
-        <div id="壁纸上传区域" class="壁纸上传区域">
-            <i data-lucide="upload" class="w-12 h-12 mx-auto mb-4 text-gray-400"></i>
-            <p class="font-medium mb-1">上传壁纸图片</p>
-            <p class="text-sm text-gray-500 mb-2">点击或拖拽图片到此处</p>
-            <p class="text-xs text-gray-400">支持 JPG, PNG, GIF 格式，建议尺寸 ≥ 1920×1080</p>
-            <input type="file" id="壁纸文件输入" accept="image/jpeg,image/png,image/gif" class="hidden">
-        </div>
-        
-        <div class="壁纸控制按钮">
-            <button id="移除壁纸按钮" class="flex-1 px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">
-                移除壁纸
-            </button>
-            <button id="使用默认壁纸按钮" class="flex-1 px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">
-                默认壁纸
-            </button>
-        </div>
-        
-        <div class="mt-4 pt-4 border-t">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-sm">壁纸亮度</span>
-                <span id="壁纸亮度值" class="text-sm font-medium">70%</span>
+    
+    <!-- 壁纸弹窗 -->
+    <div id="wallpaperModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold">自定义壁纸</h2>
+                <button id="closeWallpaper" class="p-1 rounded-full hover:bg-gray-100">
+                    <i data-lucide="x"></i>
+                </button>
             </div>
-            <input type="range" id="壁纸亮度滑块" min="10" max="100" value="70" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
             
-            <div class="flex items-center justify-between mt-4 mb-2">
-                <span class="text-sm">背景模糊</span>
-                <span id="背景模糊值" class="text-sm font-medium">开启</span>
+            <div id="wallpaperPreview" style="display: none;">
+                <h3 class="text-sm font-medium mb-2">当前壁纸预览</h3>
+                <img id="previewImg" class="w-full h-32 object-cover rounded-lg mb-4 border-2 border-dashed border-gray-300" alt="壁纸预览">
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="背景模糊开关" class="sr-only peer" checked>
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-            </label>
+            
+            <div id="uploadArea" class="upload-area mb-4">
+                <i data-lucide="upload" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                <p class="font-medium mb-1">上传壁纸图片</p>
+                <p class="text-sm text-gray-500 mb-2">点击或拖拽图片到此处</p>
+                <p class="text-xs text-gray-400">支持 JPG, PNG, GIF 格式，建议尺寸 ≥ 1920×1080</p>
+                <input type="file" id="wallpaperInput" accept="image/*" class="hidden">
+            </div>
+            
+            <div class="flex gap-2 mb-4">
+                <button id="removeWallpaper" class="flex-1 px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">移除壁纸</button>
+                <button id="defaultWallpaper" class="flex-1 px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">默认壁纸</button>
+            </div>
+            
+            <div class="border-t pt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm">壁纸亮度</span>
+                    <span id="brightnessValue" class="text-sm font-medium">70%</span>
+                </div>
+                <input type="range" id="brightnessSlider" min="10" max="100" value="70" class="w-full">
+                
+                <div class="flex items-center justify-between mt-4 mb-2">
+                    <span class="text-sm">背景模糊</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="blurToggle" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                    </label>
+                </div>
+            </div>
         </div>
+    </div>
+    
+    <!-- 编辑日程弹窗 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold">编辑日程</h2>
+                <button id="closeEdit" class="p-1 rounded-full hover:bg-gray-100">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            
+            <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                <p class="text-sm text-blue-800">
+                    <i data-lucide="info" class="inline w-4 h-4"></i>
+                    当前编辑：<span id="editDayTypeLabel" class="font-semibold"></span>
+                </p>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">选择要编辑的日程类型</label>
+                <div class="flex gap-2">
+                    <button id="editExerciseDay" class="flex-1 px-4 py-2 rounded-lg border-2 border-blue-400 bg-blue-50 text-blue-700 font-medium">
+                        锻炼日
+                    </button>
+                    <button id="editStudyDay" class="flex-1 px-4 py-2 rounded-lg border-2 border-gray-300 text-gray-600">
+                        不锻炼日
+                    </button>
+                </div>
+            </div>
+            
+            <div id="scheduleEditList" class="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                <!-- 动态生成编辑列表 -->
+            </div>
+            
+            <div class="flex gap-2">
+                <button id="addScheduleItem" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition">
+                    <i data-lucide="plus" class="inline w-4 h-4"></i>
+                    添加新项目
+                </button>
+                <button id="saveSchedule" class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
+                    <i data-lucide="save" class="inline w-4 h-4"></i>
+                    保存更改
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 音乐播放器 -->
+    <div class="music-player" id="musicPlayer">
+        <div id="uploadMusicArea" class="upload-area !p-3 !mb-2">
+            <i data-lucide="music" class="w-6 h-6 mx-auto mb-1 text-gray-400"></i>
+            <p class="font-medium text-xs mb-1">上传背景音乐 (MP3)</p>
+            <p class="text-xs text-gray-500">点击或拖拽MP3文件（≤10M）</p>
+            <input type="file" id="musicInput" accept="audio/mpeg" class="hidden">
+        </div>
+        <div id="musicControls" style="display: none;">
+            <div id="musicName" class="text-sm text-gray-600 mb-2 truncate">未选择音乐</div>
+            <div class="flex items-center gap-2">
+                <button id="playPauseBtn" class="w-10 h-10 rounded-full flex items-center justify-center text-white transition" style="background-color: var(--primary-color);">
+                    <i data-lucide="play" class="w-5 h-5"></i>
+                </button>
+                <div id="progressBar" class="flex-1 h-1.5 bg-gray-200 rounded-full cursor-pointer relative">
+                    <div id="progressFill" class="absolute left-0 top-0 h-full rounded-full transition-all" style="background-color: var(--primary-color); width: 0%;"></div>
+                </div>
+                <div id="timeDisplay" class="text-xs text-gray-500">00:00/00:00</div>
+            </div>
+        </div>
+        <audio id="audioElement" loop></audio>
     </div>
 
     <script>
-        // 根据用户提供的课表更新日程数据
-        const 锻炼日日程 = [
-            { time: '05:00 - 05:10', activity: '起床+洗漱+拉伸+护眼', duration: '10分钟' },
-            { time: '05:10 - 07:10', activity: '数学1', duration: '2小时' },
-            { time: '07:10 - 07:30', activity: '休息+早餐', duration: '20分钟' },
-            { time: '07:30 - 09:30', activity: '语文1', duration: '2小时' },
-            { time: '09:30 - 09:50', activity: '休息+护眼', duration: '20分钟' },
-            { time: '09:50 - 11:50', activity: '理综', duration: '2小时' },
-            { time: '11:50 - 12:20', activity: '午餐+休息', duration: '30分钟' },
-            { time: '12:20 - 14:20', activity: '数学2', duration: '2小时' },
-            { time: '14:20 - 14:40', activity: '休息+补水', duration: '20分钟' },
-            { time: '14:40 - 16:40', activity: '英语', duration: '2小时' },
-            { time: '16:40 - 17:40', activity: '锻炼', duration: '1小时' },
-            { time: '17:40 - 18:00', activity: '休息+补充能量', duration: '20分钟' },
-            { time: '18:00 - 20:00', activity: '语文2', duration: '2小时' },
-            { time: '20:00 - 20:20', activity: '休息+护眼', duration: '20分钟' },
-            { time: '20:20 - 22:20', activity: '数学3', duration: '2小时' },
-            { time: '22:20 - 22:40', activity: '休息+整理笔记', duration: '20分钟' },
-            { time: '22:40 - 00:40', activity: '计算机', duration: '2小时' },
-            { time: '00:40 - 02:00', activity: '自由调整', duration: '80分钟' }
-        ];
-
-        const 不锻炼日日程 = [
-            { time: '05:00 - 05:10', activity: '起床+洗漱+拉伸+护眼', duration: '10分钟' },
-            { time: '05:10 - 07:10', activity: '数学1', duration: '2小时' },
-            { time: '07:10 - 07:30', activity: '休息+早餐', duration: '20分钟' },
-            { time: '07:30 - 09:30', activity: '语文1', duration: '2小时' },
-            { time: '09:30 - 09:50', activity: '休息+护眼', duration: '20分钟' },
-            { time: '09:50 - 11:50', activity: '理综', duration: '2小时' },
-            { time: '11:50 - 12:20', activity: '午餐+休息', duration: '30分钟' },
-            { time: '12:20 - 14:20', activity: '数学2', duration: '2小时' },
-            { time: '14:20 - 14:40', activity: '休息+补水', duration: '20分钟' },
-            { time: '14:40 - 16:40', activity: '英语', duration: '2小时' },
-            { time: '16:40 - 18:40', activity: '数学4', duration: '2小时' },
-            { time: '18:40 - 19:00', activity: '休息+晚餐', duration: '20分钟' },
-            { time: '19:00 - 21:00', activity: '语文3', duration: '2小时' },
-            { time: '21:00 - 21:20', activity: '休息', duration: '20分钟' },
-            { time: '21:20 - 23:20', activity: '计算机', duration: '2小时' },
-            { time: '23:20 - 02:00', activity: '自由调整', duration: '100分钟' }
-        ];
-
-        let 当前日期 = new Date();
-        let 统计图表 = null;
-
-        function 初始化() {
-            lucide.createIcons();
-            加载护眼模式设置(); // 加载护眼模式设置
-            更新日期和日程();
-            加载打卡记录();
-            绑定事件();
-            加载壁纸设置();
-        }
-
-        function 更新日期和日程() {
-            const 星期几 = ['日', '一', '二', '三', '四', '五', '六'];
-            const 日期字符串 = `${当前日期.getFullYear()} 年 ${当前日期.getMonth() + 1} 月 ${当前日期.getDate()} 日 周${星期几[当前日期.getDay()]}`;
-            document.getElementById('当前日期').textContent = 日期字符串;
-
-            const 日期键 = 当前日期.toISOString().split('T')[0];
+        // ===== 应用状态管理 =====
+        const AppState = {
+            currentDate: new Date(),
+            statsChart: null,
+            audioElement: null,
+            isPlaying: false,
+            editingDayType: 'exercise', // 'exercise' or 'study'
             
-            // 修改判断逻辑：每两天为一个不锻炼日
-            // 计算从固定日期（如2020年1月1日）开始的天数，然后取模2
-            const 固定日期 = new Date('2020-01-01');
-            const 时间差 = 当前日期.getTime() - 固定日期.getTime();
-            const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
-            const 是锻炼日 = 天数差 % 2 === 0; // 如果模2为0是锻炼日，为1是不锻炼日
-            
-            const 日程 = 是锻炼日 ? 锻炼日日程 : 不锻炼日日程;
-
-            // 只在非护眼模式下应用主题样式
-            const 护眼模式开启 = localStorage.getItem('护眼模式') === 'true';
-            if (!护眼模式开启) {
-                document.body.className = 是锻炼日 ? 'day-type-exercise' : 'day-type-study';
+            // 默认日程数据
+            defaultSchedules: {
+                exercise: [
+                    { time: '05:00 - 05:10', activity: '起床+洗漱+拉伸+护眼', duration: '10分钟' },
+                    { time: '05:10 - 07:10', activity: '数学1', duration: '2小时' },
+                    { time: '07:10 - 07:30', activity: '休息+早餐', duration: '20分钟' },
+                    { time: '07:30 - 09:30', activity: '语文1', duration: '2小时' },
+                    { time: '09:30 - 09:50', activity: '休息+护眼', duration: '20分钟' },
+                    { time: '09:50 - 11:50', activity: '理综', duration: '2小时' },
+                    { time: '11:50 - 12:20', activity: '午餐+休息', duration: '30分钟' },
+                    { time: '12:20 - 14:20', activity: '数学2', duration: '2小时' },
+                    { time: '14:20 - 14:40', activity: '休息+补水', duration: '20分钟' },
+                    { time: '14:40 - 16:40', activity: '英语', duration: '2小时' },
+                    { time: '16:40 - 17:40', activity: '锻炼', duration: '1小时' },
+                    { time: '17:40 - 18:00', activity: '休息+补充能量', duration: '20分钟' },
+                    { time: '18:00 - 20:00', activity: '语文2', duration: '2小时' },
+                    { time: '20:00 - 20:20', activity: '休息+护眼', duration: '20分钟' },
+                    { time: '20:20 - 22:20', activity: '数学3', duration: '2小时' },
+                    { time: '22:20 - 22:40', activity: '休息+整理笔记', duration: '20分钟' },
+                    { time: '22:40 - 00:40', activity: '计算机', duration: '2小时' },
+                    { time: '00:40 - 02:00', activity: '自由调整', duration: '80分钟' }
+                ],
+                study: [
+                    { time: '05:00 - 05:10', activity: '起床+洗漱+拉伸+护眼', duration: '10分钟' },
+                    { time: '05:10 - 07:10', activity: '数学1', duration: '2小时' },
+                    { time: '07:10 - 07:30', activity: '休息+早餐', duration: '20分钟' },
+                    { time: '07:30 - 09:30', activity: '语文1', duration: '2小时' },
+                    { time: '09:30 - 09:50', activity: '休息+护眼', duration: '20分钟' },
+                    { time: '09:50 - 11:50', activity: '理综', duration: '2小时' },
+                    { time: '11:50 - 12:20', activity: '午餐+休息', duration: '30分钟' },
+                    { time: '12:20 - 14:20', activity: '数学2', duration: '2小时' },
+                    { time: '14:20 - 14:40', activity: '休息+补水', duration: '20分钟' },
+                    { time: '14:40 - 16:40', activity: '英语', duration: '2小时' },
+                    { time: '16:40 - 18:40', activity: '数学4', duration: '2小时' },
+                    { time: '18:40 - 19:00', activity: '休息+晚餐', duration: '20分钟' },
+                    { time: '19:00 - 21:00', activity: '语文3', duration: '2小时' },
+                    { time: '21:00 - 21:20', activity: '休息', duration: '20分钟' },
+                    { time: '21:20 - 23:20', activity: '计算机', duration: '2小时' },
+                    { time: '23:20 - 02:00', activity: '自由调整', duration: '100分钟' }
+                ]
             }
+        };
+        
+        // ===== 工具函数 =====
+        const Utils = {
+            // 格式化日期
+            formatDate(date) {
+                const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+                return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日 周${weekdays[date.getDay()]}`;
+            },
             
-            document.getElementById('今日类型').textContent = 是锻炼日 ? '锻炼日' : '不锻炼日';
-            document.getElementById('今日类型').className = `text-sm font-semibold mt-1 ${是锻炼日 ? 'text-blue-500' : 'text-green-500'}`;
-
-            渲染日程表(日程, 日期键);
-            更新打卡进度(日期键, 日程.length);
-        }
-
-        function 渲染日程表(日程, 日期键) {
-            const 日程表 = document.getElementById('日程表');
-            日程表.innerHTML = '';
-
-            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
-            const 当日打卡 = 打卡记录[日期键] || [];
-
-            日程.forEach((item, index) => {
-                const 是否已打卡 = 当日打卡.includes(index);
-                const 行 = document.createElement('tr');
-                行.className = 'border-b hover:bg-gray-50';
-                行.innerHTML = `
-                    <td class="py-3">${item.time}</td>
-                    <td class="py-3 text-center relative">
-                        <span class="课程项目 ${是否已打卡 ? '已完成' : ''}">${item.activity}</span>
-                    </td>
-                    <td class="py-3 text-right">
-                        <span>${item.duration}</span>
-                        <button class="打卡按钮 ml-2 w-6 h-6 rounded-full flex items-center justify-center ${是否已打卡 ? '已完成' : ''}" data-index="${index}">
-                            <i data-lucide="check" class="w-4 h-4 text-white"></i>
-                        </button>
-                    </td>
-                `;
-                日程表.appendChild(行);
-            });
-            lucide.createIcons();
-        }
-
-        function 绑定事件() {
-            document.getElementById('切换日期按钮-前一天').addEventListener('click', () => {
-                当前日期.setDate(当前日期.getDate() - 1);
-                更新日期和日程();
-            });
-
-            document.getElementById('切换日期按钮-后一天').addEventListener('click', () => {
-                当前日期.setDate(当前日期.getDate() + 1);
-                更新日期和日程();
-            });
-
-            document.getElementById('一键打卡按钮').addEventListener('click', 一键打卡);
-            document.getElementById('统计按钮').addEventListener('click', 显示统计弹窗);
-            document.getElementById('关闭统计弹窗按钮').addEventListener('click', 关闭统计弹窗);
-            document.getElementById('护眼模式按钮').addEventListener('click', 切换护眼模式);
-            document.getElementById('壁纸按钮').addEventListener('click', 显示壁纸弹窗);
-            document.getElementById('关闭壁纸弹窗按钮').addEventListener('click', 关闭壁纸弹窗);
-            document.getElementById('遮罩层').addEventListener('click', 关闭所有弹窗);
-            document.getElementById('移除壁纸按钮').addEventListener('click', 移除壁纸);
-            document.getElementById('使用默认壁纸按钮').addEventListener('click', 使用默认壁纸);
-            document.getElementById('壁纸文件输入').addEventListener('change', 处理壁纸上传);
-            document.getElementById('壁纸亮度滑块').addEventListener('input', 更新壁纸亮度);
-            document.getElementById('背景模糊开关').addEventListener('change', 切换背景模糊);
-
-            // 拖拽上传功能
-            const 上传区域 = document.getElementById('壁纸上传区域');
-            const 文件输入 = document.getElementById('壁纸文件输入');
+            // 获取日期键
+            getDateKey(date) {
+                return date.toISOString().split('T')[0];
+            },
             
-            上传区域.addEventListener('click', () => 文件输入.click());
+            // 判断是否为锻炼日
+            isExerciseDay(date) {
+                const fixedDate = new Date('2020-01-01');
+                const daysDiff = Math.floor((date.getTime() - fixedDate.getTime()) / (1000 * 3600 * 24));
+                return daysDiff % 2 === 0;
+            },
             
-            上传区域.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                上传区域.classList.add('dragover');
-            });
+            // 格式化时间（秒转分:秒）
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            },
             
-            上传区域.addEventListener('dragleave', () => {
-                上传区域.classList.remove('dragover');
-            });
+            // 显示模态框
+            showModal(modalId) {
+                document.getElementById(modalId).style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+                document.body.classList.add('overflow-hidden');
+            },
             
-            上传区域.addEventListener('drop', (e) => {
-                e.preventDefault();
-                上传区域.classList.remove('dragover');
+            // 隐藏模态框
+            hideModal(modalId) {
+                document.getElementById(modalId).style.display = 'none';
+                document.getElementById('overlay').style.display = 'none';
+                document.body.classList.remove('overflow-hidden');
+            },
+            
+            // 隐藏所有模态框
+            hideAllModals() {
+                document.querySelectorAll('.modal').forEach(modal => {
+                    modal.style.display = 'none';
+                });
+                document.getElementById('overlay').style.display = 'none';
+                document.body.classList.remove('overflow-hidden');
+            }
+        };
+        
+        // ===== 本地存储管理 =====
+        const Storage = {
+            // 获取打卡记录
+            getCheckRecords() {
+                return JSON.parse(localStorage.getItem('checkRecords') || '{}');
+            },
+            
+            // 保存打卡记录
+            saveCheckRecords(records) {
+                localStorage.setItem('checkRecords', JSON.stringify(records));
+            },
+            
+            // 获取自定义日程
+            getCustomSchedule(type) {
+                const key = `customSchedule_${type}`;
+                const stored = localStorage.getItem(key);
+                return stored ? JSON.parse(stored) : null;
+            },
+            
+            // 保存自定义日程
+            saveCustomSchedule(type, schedule) {
+                const key = `customSchedule_${type}`;
+                localStorage.setItem(key, JSON.stringify(schedule));
+            },
+            
+            // 获取当前日程（自定义或默认）
+            getCurrentSchedule(type) {
+                return this.getCustomSchedule(type) || AppState.defaultSchedules[type];
+            },
+            
+            // 获取壁纸设置
+            getWallpaperSettings() {
+                return JSON.parse(localStorage.getItem('wallpaperSettings') || '{}');
+            },
+            
+            // 保存壁纸设置
+            saveWallpaperSettings(settings) {
+                localStorage.setItem('wallpaperSettings', JSON.stringify(settings));
+            },
+            
+            // 获取护眼模式状态
+            getEyeProtectionMode() {
+                return localStorage.getItem('eyeProtection') === 'true';
+            },
+            
+            // 保存护眼模式状态
+            saveEyeProtectionMode(enabled) {
+                localStorage.setItem('eyeProtection', enabled.toString());
+            }
+        };
+        
+        // ===== 日程管理 =====
+        const ScheduleManager = {
+            // 渲染日程表
+            render() {
+                const isExercise = Utils.isExerciseDay(AppState.currentDate);
+                const scheduleType = isExercise ? 'exercise' : 'study';
+                const schedule = Storage.getCurrentSchedule(scheduleType);
+                const dateKey = Utils.getDateKey(AppState.currentDate);
+                const checkRecords = Storage.getCheckRecords();
+                const todayChecks = checkRecords[dateKey] || [];
                 
-                if (e.dataTransfer.files.length > 0) {
-                    const 文件 = e.dataTransfer.files[0];
-                    if (文件.type.startsWith('image/')) {
-                        读取壁纸文件(文件);
-                    } else {
-                        alert('请选择图片文件！');
-                    }
-                }
-            });
-
-            document.getElementById('日程表').addEventListener('click', (e) => {
-                const 按钮 = e.target.closest('.打卡按钮');
-                if (按钮) {
-                    const 索引 = parseInt(按钮.dataset.index);
-                    切换打卡状态(索引);
-                }
-            });
-        }
-
-        function 切换打卡状态(索引) {
-            const 日期键 = 当前日期.toISOString().split('T')[0];
-            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
-            if (!打卡记录[日期键]) {
-                打卡记录[日期键] = [];
-            }
-
-            const 当日打卡 = 打卡记录[日期键];
-            const 索引位置 = 当日打卡.indexOf(索引);
-            if (索引位置 > -1) {
-                当日打卡.splice(索引位置, 1);
-            } else {
-                当日打卡.push(索引);
-            }
-
-            localStorage.setItem('打卡记录', JSON.stringify(打卡记录));
-            更新日期和日程();
-        }
-
-        function 一键打卡() {
-            const 日期键 = 当前日期.toISOString().split('T')[0];
-            const 固定日期 = new Date('2020-01-01');
-            const 时间差 = 当前日期.getTime() - 固定日期.getTime();
-            const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
-            const 是锻炼日 = 天数差 % 2 === 0;
-            const 日程 = 是锻炼日 ? 锻炼日日程 : 不锻炼日日程;
+                const tableBody = document.getElementById('scheduleTable');
+                tableBody.innerHTML = '';
+                
+                schedule.forEach((item, index) => {
+                    const isChecked = todayChecks.includes(index);
+                    const row = document.createElement('tr');
+                    row.className = 'border-b hover:bg-gray-50 transition';
+                    row.innerHTML = `
+                        <td class="py-3 px-2 text-sm">${item.time}</td>
+                        <td class="py-3 px-2 text-center">
+                            <span class="schedule-item ${isChecked ? 'completed' : ''}">${item.activity}</span>
+                        </td>
+                        <td class="py-3 px-2 text-center text-sm text-gray-600">${item.duration}</td>
+                        <td class="py-3 px-2 text-right">
+                            <button class="check-btn w-6 h-6 rounded-full inline-flex items-center justify-center ${isChecked ? 'completed' : ''}" data-index="${index}">
+                                <i data-lucide="check" class="w-4 h-4 text-white"></i>
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                
+                lucide.createIcons();
+                this.updateProgress();
+            },
             
-            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
-            打卡记录[日期键] = Array.from({length: 日程.length}, (_, i) => i);
-            localStorage.setItem('打卡记录', JSON.stringify(打卡记录));
-            更新日期和日程();
-        }
-
-        function 更新打卡进度(日期键, 总活动数) {
-            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
-            const 当日打卡 = 打卡记录[日期键] || [];
-            const 完成数 = 当日打卡.length;
-            document.getElementById('打卡进度').textContent = `已完成 ${完成数}/${总活动数} 项`;
-        }
-
-        function 加载打卡记录() {
-            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
-            const 今天 = new Date();
-            for (let i = 1; i <= 7; i++) {
-                const 日期 = new Date(今天);
-                日期.setDate(日期.getDate() - i);
-                const 日期键 = 日期.toISOString().split('T')[0];
-                if (!打卡记录[日期键]) {
-                    const 固定日期 = new Date('2020-01-01');
-                    const 时间差 = 日期.getTime() - 固定日期.getTime();
-                    const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
-                    const 是锻炼日 = 天数差 % 2 === 0;
-                    const 日程 = 是锻炼日 ? 锻炼日日程 : 不锻炼日日程;
+            // 更新进度显示
+            updateProgress() {
+                const isExercise = Utils.isExerciseDay(AppState.currentDate);
+                const scheduleType = isExercise ? 'exercise' : 'study';
+                const schedule = Storage.getCurrentSchedule(scheduleType);
+                const dateKey = Utils.getDateKey(AppState.currentDate);
+                const checkRecords = Storage.getCheckRecords();
+                const todayChecks = checkRecords[dateKey] || [];
+                
+                document.getElementById('progress').textContent = 
+                    `已完成 ${todayChecks.length}/${schedule.length} 项`;
+            },
+            
+            // 切换打卡状态
+            toggleCheck(index) {
+                const dateKey = Utils.getDateKey(AppState.currentDate);
+                const checkRecords = Storage.getCheckRecords();
+                
+                if (!checkRecords[dateKey]) {
+                    checkRecords[dateKey] = [];
+                }
+                
+                const todayChecks = checkRecords[dateKey];
+                const checkIndex = todayChecks.indexOf(index);
+                
+                if (checkIndex > -1) {
+                    todayChecks.splice(checkIndex, 1);
+                } else {
+                    todayChecks.push(index);
+                }
+                
+                Storage.saveCheckRecords(checkRecords);
+                this.render();
+            },
+            
+            // 一键打卡
+            checkAll() {
+                const isExercise = Utils.isExerciseDay(AppState.currentDate);
+                const scheduleType = isExercise ? 'exercise' : 'study';
+                const schedule = Storage.getCurrentSchedule(scheduleType);
+                const dateKey = Utils.getDateKey(AppState.currentDate);
+                const checkRecords = Storage.getCheckRecords();
+                
+                checkRecords[dateKey] = Array.from({length: schedule.length}, (_, i) => i);
+                Storage.saveCheckRecords(checkRecords);
+                this.render();
+            }
+        };
+        
+        // ===== 编辑功能 =====
+        const EditManager = {
+            currentEditType: 'exercise',
+            
+            // 打开编辑模态框
+            open() {
+                this.currentEditType = Utils.isExerciseDay(AppState.currentDate) ? 'exercise' : 'study';
+                this.updateUI();
+                this.renderEditList();
+                Utils.showModal('editModal');
+            },
+            
+            // 更新UI状态
+            updateUI() {
+                const exerciseBtn = document.getElementById('editExerciseDay');
+                const studyBtn = document.getElementById('editStudyDay');
+                const label = document.getElementById('editDayTypeLabel');
+                
+                if (this.currentEditType === 'exercise') {
+                    exerciseBtn.className = 'flex-1 px-4 py-2 rounded-lg border-2 border-blue-400 bg-blue-50 text-blue-700 font-medium';
+                    studyBtn.className = 'flex-1 px-4 py-2 rounded-lg border-2 border-gray-300 text-gray-600';
+                    label.textContent = '锻炼日';
+                } else {
+                    exerciseBtn.className = 'flex-1 px-4 py-2 rounded-lg border-2 border-gray-300 text-gray-600';
+                    studyBtn.className = 'flex-1 px-4 py-2 rounded-lg border-2 border-green-400 bg-green-50 text-green-700 font-medium';
+                    label.textContent = '不锻炼日';
+                }
+            },
+            
+            // 渲染编辑列表
+            renderEditList() {
+                const schedule = Storage.getCurrentSchedule(this.currentEditType);
+                const container = document.getElementById('scheduleEditList');
+                container.innerHTML = '';
+                
+                schedule.forEach((item, index) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'border rounded-lg p-3 bg-white';
+                    itemDiv.innerHTML = `
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-sm font-medium text-gray-500">#${index + 1}</span>
+                            <button class="ml-auto p-1 text-red-500 hover:bg-red-50 rounded" onclick="EditManager.deleteItem(${index})">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <div>
+                                <label class="text-xs text-gray-600">时间段</label>
+                                <input type="text" class="edit-input" value="${item.time}" data-index="${index}" data-field="time">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">活动内容</label>
+                                <input type="text" class="edit-input" value="${item.activity}" data-index="${index}" data-field="activity">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">时长</label>
+                                <input type="text" class="edit-input" value="${item.duration}" data-index="${index}" data-field="duration">
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(itemDiv);
+                });
+                
+                lucide.createIcons();
+            },
+            
+            // 添加新项目
+            addItem() {
+                const schedule = Storage.getCurrentSchedule(this.currentEditType);
+                schedule.push({
+                    time: '00:00 - 00:00',
+                    activity: '新活动',
+                    duration: '0分钟'
+                });
+                Storage.saveCustomSchedule(this.currentEditType, schedule);
+                this.renderEditList();
+            },
+            
+            // 删除项目
+            deleteItem(index) {
+                if (!confirm('确定要删除这个项目吗？')) return;
+                
+                const schedule = Storage.getCurrentSchedule(this.currentEditType);
+                schedule.splice(index, 1);
+                Storage.saveCustomSchedule(this.currentEditType, schedule);
+                this.renderEditList();
+            },
+            
+            // 保存更改
+            save() {
+                const inputs = document.querySelectorAll('#scheduleEditList .edit-input');
+                const schedule = Storage.getCurrentSchedule(this.currentEditType);
+                
+                inputs.forEach(input => {
+                    const index = parseInt(input.dataset.index);
+                    const field = input.dataset.field;
+                    schedule[index][field] = input.value.trim();
+                });
+                
+                Storage.saveCustomSchedule(this.currentEditType, schedule);
+                Utils.hideModal('editModal');
+                ScheduleManager.render();
+                DateManager.updateDisplay();
+                
+                alert('日程已保存！');
+            },
+            
+            // 切换编辑类型
+            switchType(type) {
+                this.currentEditType = type;
+                this.updateUI();
+                this.renderEditList();
+            }
+        };
+        
+        // ===== 日期管理 =====
+        const DateManager = {
+            // 更新显示
+            updateDisplay() {
+                document.getElementById('currentDate').textContent = Utils.formatDate(AppState.currentDate);
+                
+                const isExercise = Utils.isExerciseDay(AppState.currentDate);
+                const dayTypeEl = document.getElementById('dayType');
+                dayTypeEl.textContent = isExercise ? '锻炼日' : '不锻炼日';
+                dayTypeEl.className = `text-sm font-semibold mt-1 ${isExercise ? 'text-blue-500' : 'text-green-500'}`;
+                
+                // 更新主题
+                const eyeProtection = Storage.getEyeProtectionMode();
+                if (!eyeProtection) {
+                    document.body.className = isExercise ? 'day-type-exercise' : 'day-type-study';
+                }
+                
+                ScheduleManager.render();
+            },
+            
+            // 前一天
+            prevDay() {
+                AppState.currentDate.setDate(AppState.currentDate.getDate() - 1);
+                this.updateDisplay();
+            },
+            
+            // 后一天
+            nextDay() {
+                AppState.currentDate.setDate(AppState.currentDate.getDate() + 1);
+                this.updateDisplay();
+            }
+        };
+        
+        // ===== 统计功能 =====
+        const StatsManager = {
+            // 显示统计
+            show() {
+                Utils.showModal('statsModal');
+                this.render();
+            },
+            
+            // 渲染图表
+            render() {
+                const ctx = document.getElementById('statsChart').getContext('2d');
+                const checkRecords = Storage.getCheckRecords();
+                const labels = [];
+                const data = [];
+                
+                for (let i = 6; i >= 0; i--) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    const dateKey = Utils.getDateKey(date);
                     
-                    const 完成率 = Math.random() * 0.5 + 0.5;
-                    const 完成数 = Math.floor(日程.length * 完成率);
-                    const 当日打卡 = Array.from({length: 完成数}, (_, i) => i);
-                    打卡记录[日期键] = 当日打卡;
+                    const isExercise = Utils.isExerciseDay(date);
+                    const scheduleType = isExercise ? 'exercise' : 'study';
+                    const totalItems = Storage.getCurrentSchedule(scheduleType).length;
+                    const checkedItems = checkRecords[dateKey] ? checkRecords[dateKey].length : 0;
+                    const completionRate = (checkedItems / totalItems * 100).toFixed(0);
+                    
+                    labels.push(`${date.getMonth() + 1}/${date.getDate()}`);
+                    data.push(completionRate);
                 }
-            }
-            localStorage.setItem('打卡记录', JSON.stringify(打卡记录));
-        }
-
-        function 显示统计弹窗() {
-            document.getElementById('统计弹窗').style.display = 'block';
-            document.getElementById('遮罩层').style.display = 'block';
-            渲染统计图表();
-        }
-
-        function 关闭统计弹窗() {
-            document.getElementById('统计弹窗').style.display = 'none';
-            document.getElementById('遮罩层').style.display = 'none';
-        }
-
-        function 关闭所有弹窗() {
-            关闭统计弹窗();
-            关闭壁纸弹窗();
-        }
-
-        function 渲染统计图表() {
-            const ctx = document.getElementById('统计图表').getContext('2d');
-            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
-            const 标签 = [];
-            const 数据 = [];
-
-            for (let i = 6; i >= 0; i--) {
-                const 日期 = new Date();
-                日期.setDate(日期.getDate() - i);
-                const 日期键 = 日期.toISOString().split('T')[0];
                 
-                const 固定日期 = new Date('2020-01-01');
-                const 时间差 = 日期.getTime() - 固定日期.getTime();
-                const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
-                const 是锻炼日 = 天数差 % 2 === 0;
-                const 总活动数 = 是锻炼日 ? 锻炼日日程.length : 不锻炼日日程.length;
+                if (AppState.statsChart) {
+                    AppState.statsChart.destroy();
+                }
                 
-                const 完成数 = 打卡记录[日期键] ? 打卡记录[日期键].length : 0;
-                const 完成率 = (完成数 / 总活动数 * 100).toFixed(0);
-
-                标签.push(`${日期.getMonth() + 1}/${日期.getDate()}`);
-                数据.push(完成率);
-            }
-
-            if (统计图表) {
-                统计图表.destroy();
-            }
-
-            统计图表 = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: 标签,
-                    datasets: [{
-                        label: '打卡完成率 (%)',
-                        data: 数据,
-                        borderColor: 'var(--primary-color)',
-                        tension: 0.1,
-                        fill: false
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100
+                AppState.statsChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '打卡完成率 (%)',
+                            data: data,
+                            borderColor: 'rgb(147, 197, 253)',
+                            backgroundColor: 'rgba(147, 197, 253, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
                         }
                     }
+                });
+            }
+        };
+        
+        // ===== 壁纸管理 =====
+        const WallpaperManager = {
+            // 显示壁纸设置
+            show() {
+                Utils.showModal('wallpaperModal');
+                this.updatePreview();
+            },
+            
+            // 更新预览
+            updatePreview() {
+                const settings = Storage.getWallpaperSettings();
+                if (settings.imageData) {
+                    document.getElementById('previewImg').src = settings.imageData;
+                    document.getElementById('wallpaperPreview').style.display = 'block';
+                } else {
+                    document.getElementById('wallpaperPreview').style.display = 'none';
                 }
-            });
-        }
-
-        // 修复护眼模式功能
-        function 切换护眼模式() {
-            const 当前模式 = localStorage.getItem('护眼模式') === 'true';
-            const 新模式 = !当前模式;
+                
+                document.getElementById('brightnessSlider').value = settings.brightness || 70;
+                document.getElementById('brightnessValue').textContent = (settings.brightness || 70) + '%';
+                document.getElementById('blurToggle').checked = settings.blur !== false;
+            },
             
-            localStorage.setItem('护眼模式', 新模式.toString());
+            // 应用壁纸
+            apply(imageData) {
+                if (!imageData) {
+                    document.body.style.backgroundImage = 'none';
+                    return;
+                }
+                
+                const settings = Storage.getWallpaperSettings();
+                const brightness = settings.brightness || 70;
+                const blur = settings.blur !== false;
+                
+                const brightnessValue = brightness / 100;
+                const backgroundStyle = `linear-gradient(rgba(255, 255, 255, ${1 - brightnessValue}), rgba(255, 255, 255, ${1 - brightnessValue})), url("${imageData}")`;
+                
+                document.body.style.backgroundImage = backgroundStyle;
+                
+                const overlays = document.querySelectorAll('.content-overlay, .music-player');
+                overlays.forEach(el => {
+                    el.style.backdropFilter = blur ? 'blur(8px)' : 'none';
+                });
+            },
             
-            if (新模式) {
-                document.body.classList.add('eye-protection');
-            } else {
-                document.body.classList.remove('eye-protection');
-                // 重新应用主题样式
-                const 固定日期 = new Date('2020-01-01');
-                const 时间差 = 当前日期.getTime() - 固定日期.getTime();
-                const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
-                const 是锻炼日 = 天数差 % 2 === 0;
-                document.body.className = 是锻炼日 ? 'day-type-exercise' : 'day-type-study';
-            }
-            
-            const 图标 = document.querySelector('#护眼模式按钮 i');
-            if (新模式) {
-                图标.setAttribute('data-lucide', 'moon');
-            } else {
-                图标.setAttribute('data-lucide', 'sun');
-            }
-            lucide.createIcons();
-        }
-
-        function 加载护眼模式设置() {
-            const 护眼模式开启 = localStorage.getItem('护眼模式') === 'true';
-            if (护眼模式开启) {
-                document.body.classList.add('eye-protection');
-                const 图标 = document.querySelector('#护眼模式按钮 i');
-                图标.setAttribute('data-lucide', 'moon');
-                lucide.createIcons();
-            }
-        }
-
-        // 壁纸功能相关函数
-        function 显示壁纸弹窗() {
-            document.getElementById('壁纸弹窗').style.display = 'block';
-            document.getElementById('遮罩层').style.display = 'block';
-            更新壁纸预览();
-        }
-
-        function 关闭壁纸弹窗() {
-            document.getElementById('壁纸弹窗').style.display = 'none';
-            document.getElementById('遮罩层').style.display = 'none';
-        }
-
-        function 处理壁纸上传(e) {
-            const 文件 = e.target.files[0];
-            if (文件) {
-                if (文件.size > 5 * 1024 * 1024) { // 5MB限制
+            // 上传壁纸
+            upload(file) {
+                if (file.size > 5 * 1024 * 1024) {
                     alert('图片大小不能超过5MB！');
                     return;
                 }
-                读取壁纸文件(文件);
-            }
-        }
-
-        function 读取壁纸文件(文件) {
-            const 文件阅读器 = new FileReader();
-            
-            文件阅读器.onload = function(e) {
-                const 图片数据 = e.target.result;
-                设置壁纸(图片数据);
-                更新壁纸预览();
-            };
-            
-            文件阅读器.onerror = function() {
-                alert('读取图片文件时出错，请重试！');
-            };
-            
-            文件阅读器.readAsDataURL(文件);
-        }
-
-        function 设置壁纸(图片数据) {
-            // 保存壁纸设置到localStorage
-            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
-            壁纸设置.图片数据 = 图片数据;
-            壁纸设置.时间戳 = new Date().getTime();
-            localStorage.setItem('壁纸设置', JSON.stringify(壁纸设置));
-            
-            // 应用壁纸
-            应用壁纸样式(图片数据);
-        }
-
-        function 应用壁纸样式(图片数据) {
-            if (!图片数据) {
-                document.body.style.backgroundImage = 'none';
-                return;
-            }
-            
-            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
-            const 亮度 = 壁纸设置.亮度 || 70;
-            const 模糊 = 壁纸设置.模糊 !== false; // 默认开启
-            
-            let 背景样式 = `linear-gradient(rgba(255, 255, 255, ${(100-亮度)/100}), rgba(255, 255, 255, ${(100-亮度)/100})), url("${图片数据}")`;
-            
-            if (模糊) {
-                背景样式 = `linear-gradient(rgba(255, 255, 255, ${(100-亮度)/100}), rgba(255, 255, 255, ${(100-亮度)/100})), url("${图片数据}")`;
-                document.querySelector('.content-overlay').style.backdropFilter = 'blur(8px)';
-            } else {
-                document.querySelector('.content-overlay').style.backdropFilter = 'none';
-            }
-            
-            document.body.style.backgroundImage = 背景样式;
-        }
-
-        function 移除壁纸() {
-            localStorage.removeItem('壁纸设置');
-            document.body.style.backgroundImage = 'none';
-            document.querySelector('.content-overlay').style.backdropFilter = 'none';
-            document.getElementById('当前壁纸预览').style.display = 'none';
-        }
-
-        function 使用默认壁纸() {
-            // 这里可以设置一个默认壁纸URL，或者移除壁纸
-            // 为了简单，我们这里使用一个在线默认壁纸
-            const 默认壁纸URL = 'https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80';
-            设置壁纸(默认壁纸URL);
-        }
-
-        function 更新壁纸预览() {
-            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
-            const 预览图 = document.getElementById('壁纸预览图');
-            const 预览区域 = document.getElementById('当前壁纸预览');
-            
-            if (壁纸设置.图片数据) {
-                预览图.src = 壁纸设置.图片数据;
-                预览区域.style.display = 'block';
-            } else {
-                预览区域.style.display = 'none';
-            }
-        }
-
-        function 加载壁纸设置() {
-            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
-            
-            if (壁纸设置.图片数据) {
-                应用壁纸样式(壁纸设置.图片数据);
                 
-                // 更新滑块和开关
-                document.getElementById('壁纸亮度滑块').value = 壁纸设置.亮度 || 70;
-                document.getElementById('壁纸亮度值').textContent = (壁纸设置.亮度 || 70) + '%';
-                
-                const 模糊开启 = 壁纸设置.模糊 !== false;
-                document.getElementById('背景模糊开关').checked = 模糊开启;
-                document.getElementById('背景模糊值').textContent = 模糊开启 ? '开启' : '关闭';
-                
-                if (!模糊开启) {
-                    document.querySelector('.content-overlay').style.backdropFilter = 'none';
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const imageData = e.target.result;
+                    const settings = Storage.getWallpaperSettings();
+                    settings.imageData = imageData;
+                    Storage.saveWallpaperSettings(settings);
+                    this.apply(imageData);
+                    this.updatePreview();
+                };
+                reader.onerror = () => alert('读取图片文件时出错，请重试！');
+                reader.readAsDataURL(file);
+            },
+            
+            // 移除壁纸
+            remove() {
+                localStorage.removeItem('wallpaperSettings');
+                this.apply(null);
+                this.updatePreview();
+            },
+            
+            // 使用默认壁纸
+            useDefault() {
+                const defaultUrl = 'https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80';
+                const settings = Storage.getWallpaperSettings();
+                settings.imageData = defaultUrl;
+                Storage.saveWallpaperSettings(settings);
+                this.apply(defaultUrl);
+                this.updatePreview();
+            },
+            
+            // 更新亮度
+            updateBrightness(value) {
+                document.getElementById('brightnessValue').textContent = value + '%';
+                const settings = Storage.getWallpaperSettings();
+                settings.brightness = parseInt(value);
+                Storage.saveWallpaperSettings(settings);
+                if (settings.imageData) {
+                    this.apply(settings.imageData);
+                }
+            },
+            
+            // 切换模糊
+            toggleBlur(enabled) {
+                const settings = Storage.getWallpaperSettings();
+                settings.blur = enabled;
+                Storage.saveWallpaperSettings(settings);
+                if (settings.imageData) {
+                    this.apply(settings.imageData);
                 }
             }
+        };
+        
+        // ===== 音乐播放器 =====
+        const MusicPlayer = {
+            // 初始化
+            init() {
+                AppState.audioElement = document.getElementById('audioElement');
+                AppState.audioElement.loop = true;
+                
+                // 更新进度
+                AppState.audioElement.addEventListener('timeupdate', () => this.updateProgress());
+                AppState.audioElement.addEventListener('loadedmetadata', () => this.updateTime());
+                AppState.audioElement.addEventListener('ended', () => {
+                    AppState.audioElement.currentTime = 0;
+                    AppState.audioElement.play();
+                });
+            },
+            
+            // 上传音乐
+            upload(file) {
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('音频文件大小不能超过10MB！');
+                    return;
+                }
+                
+                if (file.type !== 'audio/mpeg') {
+                    alert('请选择MP3格式的音频文件！');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    AppState.audioElement.src = e.target.result;
+                    document.getElementById('musicName').textContent = file.name;
+                    document.getElementById('uploadMusicArea').style.display = 'none';
+                    document.getElementById('musicControls').style.display = 'block';
+                    
+                    AppState.audioElement.play().then(() => {
+                        AppState.isPlaying = true;
+                        this.updatePlayButton();
+                    }).catch(() => {
+                        AppState.isPlaying = false;
+                        this.updatePlayButton();
+                    });
+                };
+                reader.onerror = () => alert('读取音频文件时出错，请重试！');
+                reader.readAsDataURL(file);
+            },
+            
+            // 播放/暂停
+            togglePlay() {
+                if (!AppState.audioElement.src) return;
+                
+                if (AppState.isPlaying) {
+                    AppState.audioElement.pause();
+                    AppState.isPlaying = false;
+                } else {
+                    AppState.audioElement.play();
+                    AppState.isPlaying = true;
+                }
+                this.updatePlayButton();
+            },
+            
+            // 更新播放按钮
+            updatePlayButton() {
+                const icon = document.querySelector('#playPauseBtn i');
+                icon.setAttribute('data-lucide', AppState.isPlaying ? 'pause' : 'play');
+                lucide.createIcons();
+            },
+            
+            // 更新进度
+            updateProgress() {
+                if (AppState.audioElement.duration) {
+                    const progress = (AppState.audioElement.currentTime / AppState.audioElement.duration) * 100;
+                    document.getElementById('progressFill').style.width = `${progress}%`;
+                    this.updateTime();
+                }
+            },
+            
+            // 更新时间显示
+            updateTime() {
+                if (AppState.audioElement.duration) {
+                    const current = Utils.formatTime(AppState.audioElement.currentTime);
+                    const total = Utils.formatTime(AppState.audioElement.duration);
+                    document.getElementById('timeDisplay').textContent = `${current}/${total}`;
+                }
+            },
+            
+            // 跳转进度
+            seek(e) {
+                if (!AppState.audioElement.duration) return;
+                const bar = e.currentTarget;
+                const percent = e.offsetX / bar.offsetWidth;
+                AppState.audioElement.currentTime = AppState.audioElement.duration * percent;
+            }
+        };
+        
+        // ===== 护眼模式 =====
+        const EyeProtection = {
+            // 切换模式
+            toggle() {
+                const current = Storage.getEyeProtectionMode();
+                const newMode = !current;
+                
+                Storage.saveEyeProtectionMode(newMode);
+                
+                if (newMode) {
+                    document.body.classList.add('eye-protection');
+                    document.querySelector('.music-player').classList.add('eye-protection');
+                    document.querySelectorAll('.modal-content').forEach(el => el.classList.add('eye-protection'));
+                } else {
+                    document.body.classList.remove('eye-protection');
+                    document.querySelector('.music-player').classList.remove('eye-protection');
+                    document.querySelectorAll('.modal-content').forEach(el => el.classList.remove('eye-protection'));
+                    
+                    const isExercise = Utils.isExerciseDay(AppState.currentDate);
+                    document.body.className = isExercise ? 'day-type-exercise' : 'day-type-study';
+                }
+                
+                const icon = document.querySelector('#eyeProtectionBtn i');
+                icon.setAttribute('data-lucide', newMode ? 'moon' : 'sun');
+                lucide.createIcons();
+            },
+            
+            // 加载设置
+            load() {
+                const enabled = Storage.getEyeProtectionMode();
+                if (enabled) {
+                    document.body.classList.add('eye-protection');
+                    document.querySelector('.music-player').classList.add('eye-protection');
+                    const icon = document.querySelector('#eyeProtectionBtn i');
+                    icon.setAttribute('data-lucide', 'moon');
+                    lucide.createIcons();
+                }
+            }
+        };
+        
+        // ===== 初始化历史数据 =====
+        function initializeHistoryData() {
+            const checkRecords = Storage.getCheckRecords();
+            const today = new Date();
+            
+            for (let i = 1; i <= 7; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                const dateKey = Utils.getDateKey(date);
+                
+                if (!checkRecords[dateKey]) {
+                    const isExercise = Utils.isExerciseDay(date);
+                    const scheduleType = isExercise ? 'exercise' : 'study';
+                    const schedule = Storage.getCurrentSchedule(scheduleType);
+                    
+                    const completionRate = Math.random() * 0.5 + 0.5;
+                    const completedCount = Math.floor(schedule.length * completionRate);
+                    checkRecords[dateKey] = Array.from({length: completedCount}, (_, i) => i);
+                }
+            }
+            
+            Storage.saveCheckRecords(checkRecords);
         }
-
-        function 更新壁纸亮度() {
-            const 亮度 = document.getElementById('壁纸亮度滑块').value;
-            document.getElementById('壁纸亮度值').textContent = 亮度 + '%';
+        
+        // ===== 事件绑定 =====
+        function bindEvents() {
+            // 日期切换
+            document.getElementById('prevDay').addEventListener('click', () => DateManager.prevDay());
+            document.getElementById('nextDay').addEventListener('click', () => DateManager.nextDay());
             
-            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
-            壁纸设置.亮度 = parseInt(亮度);
-            localStorage.setItem('壁纸设置', JSON.stringify(壁纸设置));
+            // 打卡
+            document.getElementById('checkAllBtn').addEventListener('click', () => ScheduleManager.checkAll());
+            document.getElementById('scheduleTable').addEventListener('click', (e) => {
+                const btn = e.target.closest('.check-btn');
+                if (btn) {
+                    const index = parseInt(btn.dataset.index);
+                    ScheduleManager.toggleCheck(index);
+                }
+            });
             
-            if (壁纸设置.图片数据) {
-                应用壁纸样式(壁纸设置.图片数据);
+            // 编辑
+            document.getElementById('editBtn').addEventListener('click', () => EditManager.open());
+            document.getElementById('closeEdit').addEventListener('click', () => Utils.hideModal('editModal'));
+            document.getElementById('editExerciseDay').addEventListener('click', () => EditManager.switchType('exercise'));
+            document.getElementById('editStudyDay').addEventListener('click', () => EditManager.switchType('study'));
+            document.getElementById('addScheduleItem').addEventListener('click', () => EditManager.addItem());
+            document.getElementById('saveSchedule').addEventListener('click', () => EditManager.save());
+            
+            // 统计
+            document.getElementById('statsBtn').addEventListener('click', () => StatsManager.show());
+            document.getElementById('closeStats').addEventListener('click', () => Utils.hideModal('statsModal'));
+            
+            // 护眼模式
+            document.getElementById('eyeProtectionBtn').addEventListener('click', () => EyeProtection.toggle());
+            
+            // 壁纸
+            document.getElementById('wallpaperBtn').addEventListener('click', () => WallpaperManager.show());
+            document.getElementById('closeWallpaper').addEventListener('click', () => Utils.hideModal('wallpaperModal'));
+            document.getElementById('removeWallpaper').addEventListener('click', () => WallpaperManager.remove());
+            document.getElementById('defaultWallpaper').addEventListener('click', () => WallpaperManager.useDefault());
+            document.getElementById('brightnessSlider').addEventListener('input', (e) => WallpaperManager.updateBrightness(e.target.value));
+            document.getElementById('blurToggle').addEventListener('change', (e) => WallpaperManager.toggleBlur(e.target.checked));
+            
+            // 壁纸上传
+            const uploadArea = document.getElementById('uploadArea');
+            const wallpaperInput = document.getElementById('wallpaperInput');
+            uploadArea.addEventListener('click', () => wallpaperInput.click());
+            wallpaperInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) WallpaperManager.upload(e.target.files[0]);
+            });
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) WallpaperManager.upload(e.dataTransfer.files[0]);
+            });
+            
+            // 音乐播放器
+            const musicUploadArea = document.getElementById('uploadMusicArea');
+            const musicInput = document.getElementById('musicInput');
+            musicUploadArea.addEventListener('click', () => musicInput.click());
+            musicInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) MusicPlayer.upload(e.target.files[0]);
+            });
+            musicUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                musicUploadArea.classList.add('dragover');
+            });
+            musicUploadArea.addEventListener('dragleave', () => musicUploadArea.classList.remove('dragover'));
+            musicUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                musicUploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) MusicPlayer.upload(e.dataTransfer.files[0]);
+            });
+            document.getElementById('playPauseBtn').addEventListener('click', () => MusicPlayer.togglePlay());
+            document.getElementById('progressBar').addEventListener('click', (e) => MusicPlayer.seek(e));
+            
+            // 点击遮罩关闭弹窗
+            document.getElementById('overlay').addEventListener('click', () => Utils.hideAllModals());
+        }
+        
+        // ===== 应用初始化 =====
+        function initializeApp() {
+            // 初始化图标
+            lucide.createIcons();
+            
+            // 加载护眼模式
+            EyeProtection.load();
+            
+            // 初始化音乐播放器
+            MusicPlayer.init();
+            
+            // 更新日期和日程
+            DateManager.updateDisplay();
+            
+            // 初始化历史数据
+            initializeHistoryData();
+            
+            // 绑定事件
+            bindEvents();
+            
+            // 加载壁纸设置
+            const wallpaperSettings = Storage.getWallpaperSettings();
+            if (wallpaperSettings.imageData) {
+                WallpaperManager.apply(wallpaperSettings.imageData);
             }
         }
-
-        function 切换背景模糊() {
-            const 模糊开启 = document.getElementById('背景模糊开关').checked;
-            document.getElementById('背景模糊值').textContent = 模糊开启 ? '开启' : '关闭';
-            
-            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
-            壁纸设置.模糊 = 模糊开启;
-            localStorage.setItem('壁纸设置', JSON.stringify(壁纸设置));
-            
-            if (壁纸设置.图片数据) {
-                应用壁纸样式(壁纸设置.图片数据);
-            }
-        }
-
-        // 初始化应用
-        初始化();
+        
+        // 启动应用
+        document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>
