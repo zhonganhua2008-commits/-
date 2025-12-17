@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高三备考专属日程打卡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        .day-type-exercise {
+            --primary-color: #93c5fd;
+            --primary-dark: #60a5fa;
+            --text-color: #1e293b;
+            --bg-color: #ffffff;
+        }
+        .day-type-study {
+            --primary-color: #86efac;
+            --primary-dark: #4ade80;
+            --text-color: #1e293b;
+            --bg-color: #ffffff;
+        }
+        
+        /* 修复护眼模式样式 */
+        .eye-protection {
+            --bg-color: #f8f6e8 !important;
+            --text-color: #3a3a3a !important;
+            background-color: #f8f6e8 !important;
+            color: #3a3a3a !important;
+        }
+        .eye-protection .content-overlay {
+            background-color: rgba(248, 246, 232, 0.95) !important;
+            color: #3a3a3a !important;
+        }
+        .eye-protection .day-type-exercise,
+        .eye-protection .day-type-study {
+            --primary-color: #8a9a5b !important;
+            --primary-dark: #6b7b47 !important;
+            --text-color: #3a3a3a !important;
+            --bg-color: #f8f6e8 !important;
+        }
+        
+        .content-overlay {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s;
+        }
+        .body-dark-overlay {
+            position: relative;
+        }
+        .body-dark-overlay::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.3);
+            z-index: -1;
+        }
+        .打卡按钮 {
+            background-color: #e5e7eb;
+            transition: all 0.2s ease;
+        }
+        .打卡按钮:hover {
+            transform: scale(1.05);
+        }
+        .打卡按钮.已完成 {
+            background-color: var(--primary-color);
+        }
+        .打卡按钮.已完成:hover {
+            background-color: var(--primary-dark);
+        }
+        .课程项目.已完成 {
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+        .统计弹窗, .壁纸弹窗 {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+        .遮罩层 {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .壁纸预览 {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            border: 2px dashed #d1d5db;
+        }
+        .壁纸控制按钮 {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .壁纸上传区域 {
+            border: 2px dashed #93c5fd;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+        }
+        .壁纸上传区域:hover {
+            border-color: #60a5fa;
+            background-color: rgba(147, 197, 253, 0.1);
+        }
+        .壁纸上传区域.dragover {
+            border-color: #4ade80;
+            background-color: rgba(134, 239, 172, 0.2);
+        }
+    </style>
+</head>
+<body class="day-type-exercise">
+
+    <div id="遮罩层" class="遮罩层"></div>
+
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="content-overlay p-6 md:p-8">
+            <header class="flex justify-between items-center mb-8">
+                <div class="flex items-center">
+                    <button id="切换日期按钮-前一天" class="p-2 rounded-full hover:bg-gray-100">
+                        <i data-lucide="chevron-left"></i>
+                    </button>
+                    <button id="切换日期按钮-后一天" class="p-2 rounded-full hover:bg-gray-100">
+                        <i data-lucide="chevron-right"></i>
+                    </button>
+                </div>
+                <div class="text-center">
+                    <h1 id="当前日期" class="text-2xl font-bold"></h1>
+                    <p id="今日类型" class="text-sm font-semibold mt-1"></p>
+                    <p id="打卡进度" class="text-xs mt-2"></p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="一键打卡按钮" class="px-4 py-2 text-sm rounded-full hover:bg-gray-100">
+                        一键打卡
+                    </button>
+                    <button id="统计按钮" class="p-2 rounded-full hover:bg-gray-100">
+                        <i data-lucide="bar-chart-3"></i>
+                    </button>
+                    <button id="护眼模式按钮" class="p-2 rounded-full hover:bg-gray-100">
+                        <i data-lucide="sun"></i>
+                    </button>
+                    <button id="壁纸按钮" class="p-2 rounded-full hover:bg-gray-100">
+                        <i data-lucide="image"></i>
+                    </button>
+                </div>
+            </header>
+
+            <main>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="py-2 w-1/4">时间段</th>
+                                <th class="py-2 w-2/4 text-center">课程 / 活动内容</th>
+                                <th class="py-2 w-1/4 text-right">时长</th>
+                            </tr>
+                        </thead>
+                        <tbody id="日程表">
+                            <!-- 日程将通过JS动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="统计弹窗" class="统计弹窗 bg-white rounded-lg shadow-lg p-6 w-80 md:w-96">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold">近7天打卡统计</h2>
+            <button id="关闭统计弹窗按钮" class="p-1 rounded-full hover:bg-gray-100">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div style="height: 200px;">
+            <canvas id="统计图表"></canvas>
+        </div>
+    </div>
+
+    <div id="壁纸弹窗" class="壁纸弹窗 bg-white rounded-lg shadow-lg p-6 w-80 md:w-96">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold">自定义壁纸</h2>
+            <button id="关闭壁纸弹窗按钮" class="p-1 rounded-full hover:bg-gray-100">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        
+        <div id="当前壁纸预览" style="display: none;">
+            <h3 class="text-sm font-medium mb-2">当前壁纸预览</h3>
+            
+        </div>
+        
+        <div id="壁纸上传区域" class="壁纸上传区域">
+            <i data-lucide="upload" class="w-12 h-12 mx-auto mb-4 text-gray-400"></i>
+            <p class="font-medium mb-1">上传壁纸图片</p>
+            <p class="text-sm text-gray-500 mb-2">点击或拖拽图片到此处</p>
+            <p class="text-xs text-gray-400">支持 JPG, PNG, GIF 格式，建议尺寸 ≥ 1920×1080</p>
+            <input type="file" id="壁纸文件输入" accept="image/jpeg,image/png,image/gif" class="hidden">
+        </div>
+        
+        <div class="壁纸控制按钮">
+            <button id="移除壁纸按钮" class="flex-1 px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">
+                移除壁纸
+            </button>
+            <button id="使用默认壁纸按钮" class="flex-1 px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">
+                默认壁纸
+            </button>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm">壁纸亮度</span>
+                <span id="壁纸亮度值" class="text-sm font-medium">70%</span>
+            </div>
+            <input type="range" id="壁纸亮度滑块" min="10" max="100" value="70" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            
+            <div class="flex items-center justify-between mt-4 mb-2">
+                <span class="text-sm">背景模糊</span>
+                <span id="背景模糊值" class="text-sm font-medium">开启</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="背景模糊开关" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+            </label>
+        </div>
+    </div>
+
+    <script>
+        // 根据用户提供的课表更新日程数据
+        const 锻炼日日程 = [
+            { time: '05:00 - 05:10', activity: '起床+洗漱+拉伸+护眼', duration: '10分钟' },
+            { time: '05:10 - 07:10', activity: '数学1', duration: '2小时' },
+            { time: '07:10 - 07:30', activity: '休息+早餐', duration: '20分钟' },
+            { time: '07:30 - 09:30', activity: '语文1', duration: '2小时' },
+            { time: '09:30 - 09:50', activity: '休息+护眼', duration: '20分钟' },
+            { time: '09:50 - 11:50', activity: '理综', duration: '2小时' },
+            { time: '11:50 - 12:20', activity: '午餐+休息', duration: '30分钟' },
+            { time: '12:20 - 14:20', activity: '数学2', duration: '2小时' },
+            { time: '14:20 - 14:40', activity: '休息+补水', duration: '20分钟' },
+            { time: '14:40 - 16:40', activity: '英语', duration: '2小时' },
+            { time: '16:40 - 17:40', activity: '锻炼', duration: '1小时' },
+            { time: '17:40 - 18:00', activity: '休息+补充能量', duration: '20分钟' },
+            { time: '18:00 - 20:00', activity: '语文2', duration: '2小时' },
+            { time: '20:00 - 20:20', activity: '休息+护眼', duration: '20分钟' },
+            { time: '20:20 - 22:20', activity: '数学3', duration: '2小时' },
+            { time: '22:20 - 22:40', activity: '休息+整理笔记', duration: '20分钟' },
+            { time: '22:40 - 00:40', activity: '计算机', duration: '2小时' },
+            { time: '00:40 - 02:00', activity: '自由调整', duration: '80分钟' }
+        ];
+
+        const 不锻炼日日程 = [
+            { time: '05:00 - 05:10', activity: '起床+洗漱+拉伸+护眼', duration: '10分钟' },
+            { time: '05:10 - 07:10', activity: '数学1', duration: '2小时' },
+            { time: '07:10 - 07:30', activity: '休息+早餐', duration: '20分钟' },
+            { time: '07:30 - 09:30', activity: '语文1', duration: '2小时' },
+            { time: '09:30 - 09:50', activity: '休息+护眼', duration: '20分钟' },
+            { time: '09:50 - 11:50', activity: '理综', duration: '2小时' },
+            { time: '11:50 - 12:20', activity: '午餐+休息', duration: '30分钟' },
+            { time: '12:20 - 14:20', activity: '数学2', duration: '2小时' },
+            { time: '14:20 - 14:40', activity: '休息+补水', duration: '20分钟' },
+            { time: '14:40 - 16:40', activity: '英语', duration: '2小时' },
+            { time: '16:40 - 18:40', activity: '数学4', duration: '2小时' },
+            { time: '18:40 - 19:00', activity: '休息+晚餐', duration: '20分钟' },
+            { time: '19:00 - 21:00', activity: '语文3', duration: '2小时' },
+            { time: '21:00 - 21:20', activity: '休息', duration: '20分钟' },
+            { time: '21:20 - 23:20', activity: '计算机', duration: '2小时' },
+            { time: '23:20 - 02:00', activity: '自由调整', duration: '100分钟' }
+        ];
+
+        let 当前日期 = new Date();
+        let 统计图表 = null;
+
+        function 初始化() {
+            lucide.createIcons();
+            加载护眼模式设置(); // 加载护眼模式设置
+            更新日期和日程();
+            加载打卡记录();
+            绑定事件();
+            加载壁纸设置();
+        }
+
+        function 更新日期和日程() {
+            const 星期几 = ['日', '一', '二', '三', '四', '五', '六'];
+            const 日期字符串 = `${当前日期.getFullYear()} 年 ${当前日期.getMonth() + 1} 月 ${当前日期.getDate()} 日 周${星期几[当前日期.getDay()]}`;
+            document.getElementById('当前日期').textContent = 日期字符串;
+
+            const 日期键 = 当前日期.toISOString().split('T')[0];
+            
+            // 修改判断逻辑：每两天为一个不锻炼日
+            // 计算从固定日期（如2020年1月1日）开始的天数，然后取模2
+            const 固定日期 = new Date('2020-01-01');
+            const 时间差 = 当前日期.getTime() - 固定日期.getTime();
+            const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
+            const 是锻炼日 = 天数差 % 2 === 0; // 如果模2为0是锻炼日，为1是不锻炼日
+            
+            const 日程 = 是锻炼日 ? 锻炼日日程 : 不锻炼日日程;
+
+            // 只在非护眼模式下应用主题样式
+            const 护眼模式开启 = localStorage.getItem('护眼模式') === 'true';
+            if (!护眼模式开启) {
+                document.body.className = 是锻炼日 ? 'day-type-exercise' : 'day-type-study';
+            }
+            
+            document.getElementById('今日类型').textContent = 是锻炼日 ? '锻炼日' : '不锻炼日';
+            document.getElementById('今日类型').className = `text-sm font-semibold mt-1 ${是锻炼日 ? 'text-blue-500' : 'text-green-500'}`;
+
+            渲染日程表(日程, 日期键);
+            更新打卡进度(日期键, 日程.length);
+        }
+
+        function 渲染日程表(日程, 日期键) {
+            const 日程表 = document.getElementById('日程表');
+            日程表.innerHTML = '';
+
+            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
+            const 当日打卡 = 打卡记录[日期键] || [];
+
+            日程.forEach((item, index) => {
+                const 是否已打卡 = 当日打卡.includes(index);
+                const 行 = document.createElement('tr');
+                行.className = 'border-b hover:bg-gray-50';
+                行.innerHTML = `
+                    <td class="py-3">${item.time}</td>
+                    <td class="py-3 text-center relative">
+                        <span class="课程项目 ${是否已打卡 ? '已完成' : ''}">${item.activity}</span>
+                    </td>
+                    <td class="py-3 text-right">
+                        <span>${item.duration}</span>
+                        <button class="打卡按钮 ml-2 w-6 h-6 rounded-full flex items-center justify-center ${是否已打卡 ? '已完成' : ''}" data-index="${index}">
+                            <i data-lucide="check" class="w-4 h-4 text-white"></i>
+                        </button>
+                    </td>
+                `;
+                日程表.appendChild(行);
+            });
+            lucide.createIcons();
+        }
+
+        function 绑定事件() {
+            document.getElementById('切换日期按钮-前一天').addEventListener('click', () => {
+                当前日期.setDate(当前日期.getDate() - 1);
+                更新日期和日程();
+            });
+
+            document.getElementById('切换日期按钮-后一天').addEventListener('click', () => {
+                当前日期.setDate(当前日期.getDate() + 1);
+                更新日期和日程();
+            });
+
+            document.getElementById('一键打卡按钮').addEventListener('click', 一键打卡);
+            document.getElementById('统计按钮').addEventListener('click', 显示统计弹窗);
+            document.getElementById('关闭统计弹窗按钮').addEventListener('click', 关闭统计弹窗);
+            document.getElementById('护眼模式按钮').addEventListener('click', 切换护眼模式);
+            document.getElementById('壁纸按钮').addEventListener('click', 显示壁纸弹窗);
+            document.getElementById('关闭壁纸弹窗按钮').addEventListener('click', 关闭壁纸弹窗);
+            document.getElementById('遮罩层').addEventListener('click', 关闭所有弹窗);
+            document.getElementById('移除壁纸按钮').addEventListener('click', 移除壁纸);
+            document.getElementById('使用默认壁纸按钮').addEventListener('click', 使用默认壁纸);
+            document.getElementById('壁纸文件输入').addEventListener('change', 处理壁纸上传);
+            document.getElementById('壁纸亮度滑块').addEventListener('input', 更新壁纸亮度);
+            document.getElementById('背景模糊开关').addEventListener('change', 切换背景模糊);
+
+            // 拖拽上传功能
+            const 上传区域 = document.getElementById('壁纸上传区域');
+            const 文件输入 = document.getElementById('壁纸文件输入');
+            
+            上传区域.addEventListener('click', () => 文件输入.click());
+            
+            上传区域.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                上传区域.classList.add('dragover');
+            });
+            
+            上传区域.addEventListener('dragleave', () => {
+                上传区域.classList.remove('dragover');
+            });
+            
+            上传区域.addEventListener('drop', (e) => {
+                e.preventDefault();
+                上传区域.classList.remove('dragover');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    const 文件 = e.dataTransfer.files[0];
+                    if (文件.type.startsWith('image/')) {
+                        读取壁纸文件(文件);
+                    } else {
+                        alert('请选择图片文件！');
+                    }
+                }
+            });
+
+            document.getElementById('日程表').addEventListener('click', (e) => {
+                const 按钮 = e.target.closest('.打卡按钮');
+                if (按钮) {
+                    const 索引 = parseInt(按钮.dataset.index);
+                    切换打卡状态(索引);
+                }
+            });
+        }
+
+        function 切换打卡状态(索引) {
+            const 日期键 = 当前日期.toISOString().split('T')[0];
+            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
+            if (!打卡记录[日期键]) {
+                打卡记录[日期键] = [];
+            }
+
+            const 当日打卡 = 打卡记录[日期键];
+            const 索引位置 = 当日打卡.indexOf(索引);
+            if (索引位置 > -1) {
+                当日打卡.splice(索引位置, 1);
+            } else {
+                当日打卡.push(索引);
+            }
+
+            localStorage.setItem('打卡记录', JSON.stringify(打卡记录));
+            更新日期和日程();
+        }
+
+        function 一键打卡() {
+            const 日期键 = 当前日期.toISOString().split('T')[0];
+            const 固定日期 = new Date('2020-01-01');
+            const 时间差 = 当前日期.getTime() - 固定日期.getTime();
+            const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
+            const 是锻炼日 = 天数差 % 2 === 0;
+            const 日程 = 是锻炼日 ? 锻炼日日程 : 不锻炼日日程;
+            
+            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
+            打卡记录[日期键] = Array.from({length: 日程.length}, (_, i) => i);
+            localStorage.setItem('打卡记录', JSON.stringify(打卡记录));
+            更新日期和日程();
+        }
+
+        function 更新打卡进度(日期键, 总活动数) {
+            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
+            const 当日打卡 = 打卡记录[日期键] || [];
+            const 完成数 = 当日打卡.length;
+            document.getElementById('打卡进度').textContent = `已完成 ${完成数}/${总活动数} 项`;
+        }
+
+        function 加载打卡记录() {
+            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
+            const 今天 = new Date();
+            for (let i = 1; i <= 7; i++) {
+                const 日期 = new Date(今天);
+                日期.setDate(日期.getDate() - i);
+                const 日期键 = 日期.toISOString().split('T')[0];
+                if (!打卡记录[日期键]) {
+                    const 固定日期 = new Date('2020-01-01');
+                    const 时间差 = 日期.getTime() - 固定日期.getTime();
+                    const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
+                    const 是锻炼日 = 天数差 % 2 === 0;
+                    const 日程 = 是锻炼日 ? 锻炼日日程 : 不锻炼日日程;
+                    
+                    const 完成率 = Math.random() * 0.5 + 0.5;
+                    const 完成数 = Math.floor(日程.length * 完成率);
+                    const 当日打卡 = Array.from({length: 完成数}, (_, i) => i);
+                    打卡记录[日期键] = 当日打卡;
+                }
+            }
+            localStorage.setItem('打卡记录', JSON.stringify(打卡记录));
+        }
+
+        function 显示统计弹窗() {
+            document.getElementById('统计弹窗').style.display = 'block';
+            document.getElementById('遮罩层').style.display = 'block';
+            渲染统计图表();
+        }
+
+        function 关闭统计弹窗() {
+            document.getElementById('统计弹窗').style.display = 'none';
+            document.getElementById('遮罩层').style.display = 'none';
+        }
+
+        function 关闭所有弹窗() {
+            关闭统计弹窗();
+            关闭壁纸弹窗();
+        }
+
+        function 渲染统计图表() {
+            const ctx = document.getElementById('统计图表').getContext('2d');
+            const 打卡记录 = JSON.parse(localStorage.getItem('打卡记录') || '{}');
+            const 标签 = [];
+            const 数据 = [];
+
+            for (let i = 6; i >= 0; i--) {
+                const 日期 = new Date();
+                日期.setDate(日期.getDate() - i);
+                const 日期键 = 日期.toISOString().split('T')[0];
+                
+                const 固定日期 = new Date('2020-01-01');
+                const 时间差 = 日期.getTime() - 固定日期.getTime();
+                const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
+                const 是锻炼日 = 天数差 % 2 === 0;
+                const 总活动数 = 是锻炼日 ? 锻炼日日程.length : 不锻炼日日程.length;
+                
+                const 完成数 = 打卡记录[日期键] ? 打卡记录[日期键].length : 0;
+                const 完成率 = (完成数 / 总活动数 * 100).toFixed(0);
+
+                标签.push(`${日期.getMonth() + 1}/${日期.getDate()}`);
+                数据.push(完成率);
+            }
+
+            if (统计图表) {
+                统计图表.destroy();
+            }
+
+            统计图表 = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: 标签,
+                    datasets: [{
+                        label: '打卡完成率 (%)',
+                        data: 数据,
+                        borderColor: 'var(--primary-color)',
+                        tension: 0.1,
+                        fill: false
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        // 修复护眼模式功能
+        function 切换护眼模式() {
+            const 当前模式 = localStorage.getItem('护眼模式') === 'true';
+            const 新模式 = !当前模式;
+            
+            localStorage.setItem('护眼模式', 新模式.toString());
+            
+            if (新模式) {
+                document.body.classList.add('eye-protection');
+            } else {
+                document.body.classList.remove('eye-protection');
+                // 重新应用主题样式
+                const 固定日期 = new Date('2020-01-01');
+                const 时间差 = 当前日期.getTime() - 固定日期.getTime();
+                const 天数差 = Math.floor(时间差 / (1000 * 3600 * 24));
+                const 是锻炼日 = 天数差 % 2 === 0;
+                document.body.className = 是锻炼日 ? 'day-type-exercise' : 'day-type-study';
+            }
+            
+            const 图标 = document.querySelector('#护眼模式按钮 i');
+            if (新模式) {
+                图标.setAttribute('data-lucide', 'moon');
+            } else {
+                图标.setAttribute('data-lucide', 'sun');
+            }
+            lucide.createIcons();
+        }
+
+        function 加载护眼模式设置() {
+            const 护眼模式开启 = localStorage.getItem('护眼模式') === 'true';
+            if (护眼模式开启) {
+                document.body.classList.add('eye-protection');
+                const 图标 = document.querySelector('#护眼模式按钮 i');
+                图标.setAttribute('data-lucide', 'moon');
+                lucide.createIcons();
+            }
+        }
+
+        // 壁纸功能相关函数
+        function 显示壁纸弹窗() {
+            document.getElementById('壁纸弹窗').style.display = 'block';
+            document.getElementById('遮罩层').style.display = 'block';
+            更新壁纸预览();
+        }
+
+        function 关闭壁纸弹窗() {
+            document.getElementById('壁纸弹窗').style.display = 'none';
+            document.getElementById('遮罩层').style.display = 'none';
+        }
+
+        function 处理壁纸上传(e) {
+            const 文件 = e.target.files[0];
+            if (文件) {
+                if (文件.size > 5 * 1024 * 1024) { // 5MB限制
+                    alert('图片大小不能超过5MB！');
+                    return;
+                }
+                读取壁纸文件(文件);
+            }
+        }
+
+        function 读取壁纸文件(文件) {
+            const 文件阅读器 = new FileReader();
+            
+            文件阅读器.onload = function(e) {
+                const 图片数据 = e.target.result;
+                设置壁纸(图片数据);
+                更新壁纸预览();
+            };
+            
+            文件阅读器.onerror = function() {
+                alert('读取图片文件时出错，请重试！');
+            };
+            
+            文件阅读器.readAsDataURL(文件);
+        }
+
+        function 设置壁纸(图片数据) {
+            // 保存壁纸设置到localStorage
+            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
+            壁纸设置.图片数据 = 图片数据;
+            壁纸设置.时间戳 = new Date().getTime();
+            localStorage.setItem('壁纸设置', JSON.stringify(壁纸设置));
+            
+            // 应用壁纸
+            应用壁纸样式(图片数据);
+        }
+
+        function 应用壁纸样式(图片数据) {
+            if (!图片数据) {
+                document.body.style.backgroundImage = 'none';
+                return;
+            }
+            
+            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
+            const 亮度 = 壁纸设置.亮度 || 70;
+            const 模糊 = 壁纸设置.模糊 !== false; // 默认开启
+            
+            let 背景样式 = `linear-gradient(rgba(255, 255, 255, ${(100-亮度)/100}), rgba(255, 255, 255, ${(100-亮度)/100})), url("${图片数据}")`;
+            
+            if (模糊) {
+                背景样式 = `linear-gradient(rgba(255, 255, 255, ${(100-亮度)/100}), rgba(255, 255, 255, ${(100-亮度)/100})), url("${图片数据}")`;
+                document.querySelector('.content-overlay').style.backdropFilter = 'blur(8px)';
+            } else {
+                document.querySelector('.content-overlay').style.backdropFilter = 'none';
+            }
+            
+            document.body.style.backgroundImage = 背景样式;
+        }
+
+        function 移除壁纸() {
+            localStorage.removeItem('壁纸设置');
+            document.body.style.backgroundImage = 'none';
+            document.querySelector('.content-overlay').style.backdropFilter = 'none';
+            document.getElementById('当前壁纸预览').style.display = 'none';
+        }
+
+        function 使用默认壁纸() {
+            // 这里可以设置一个默认壁纸URL，或者移除壁纸
+            // 为了简单，我们这里使用一个在线默认壁纸
+            const 默认壁纸URL = 'https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80';
+            设置壁纸(默认壁纸URL);
+        }
+
+        function 更新壁纸预览() {
+            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
+            const 预览图 = document.getElementById('壁纸预览图');
+            const 预览区域 = document.getElementById('当前壁纸预览');
+            
+            if (壁纸设置.图片数据) {
+                预览图.src = 壁纸设置.图片数据;
+                预览区域.style.display = 'block';
+            } else {
+                预览区域.style.display = 'none';
+            }
+        }
+
+        function 加载壁纸设置() {
+            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
+            
+            if (壁纸设置.图片数据) {
+                应用壁纸样式(壁纸设置.图片数据);
+                
+                // 更新滑块和开关
+                document.getElementById('壁纸亮度滑块').value = 壁纸设置.亮度 || 70;
+                document.getElementById('壁纸亮度值').textContent = (壁纸设置.亮度 || 70) + '%';
+                
+                const 模糊开启 = 壁纸设置.模糊 !== false;
+                document.getElementById('背景模糊开关').checked = 模糊开启;
+                document.getElementById('背景模糊值').textContent = 模糊开启 ? '开启' : '关闭';
+                
+                if (!模糊开启) {
+                    document.querySelector('.content-overlay').style.backdropFilter = 'none';
+                }
+            }
+        }
+
+        function 更新壁纸亮度() {
+            const 亮度 = document.getElementById('壁纸亮度滑块').value;
+            document.getElementById('壁纸亮度值').textContent = 亮度 + '%';
+            
+            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
+            壁纸设置.亮度 = parseInt(亮度);
+            localStorage.setItem('壁纸设置', JSON.stringify(壁纸设置));
+            
+            if (壁纸设置.图片数据) {
+                应用壁纸样式(壁纸设置.图片数据);
+            }
+        }
+
+        function 切换背景模糊() {
+            const 模糊开启 = document.getElementById('背景模糊开关').checked;
+            document.getElementById('背景模糊值').textContent = 模糊开启 ? '开启' : '关闭';
+            
+            const 壁纸设置 = JSON.parse(localStorage.getItem('壁纸设置') || '{}');
+            壁纸设置.模糊 = 模糊开启;
+            localStorage.setItem('壁纸设置', JSON.stringify(壁纸设置));
+            
+            if (壁纸设置.图片数据) {
+                应用壁纸样式(壁纸设置.图片数据);
+            }
+        }
+
+        // 初始化应用
+        初始化();
+    </script>
+</body>
+</html>
